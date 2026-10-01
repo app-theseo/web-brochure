@@ -234,7 +234,7 @@ function finalize(m){
 
 /* --- accès réseau : serveur du site d'abord, puis proxys publics en secours --- */
 const PUBLIC=[u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),u=>'https://corsproxy.io/?url='+encodeURIComponent(u)];
-const PAGE_PROXIES=[u=>'/proxy?url='+encodeURIComponent(u),...PUBLIC],IMG_PROXIES=[u=>'/img?url='+encodeURIComponent(u),...PUBLIC];
+const PAGE_PROXIES=[u=>'/proxy?url='+encodeURIComponent(u),...PUBLIC],IMG_PROXIES=[u=>'/img?url='+encodeURIComponent(u),u=>'https://wsrv.nl/?n=-1&url='+encodeURIComponent(u),...PUBLIC];
 async function viaProxies(PROXIES,u,read,ok){
   let why='';
   for(const p of PROXIES){try{const r=await fetch(p(u));if(!r.ok){why=why||(await r.text().catch(()=>'')).slice(0,120)||('HTTP '+r.status);continue}const v=await read(r);if(ok(v))return v;why=why||'contenu vide'}catch(e){why=why||String(e.message||e)}}
@@ -252,7 +252,7 @@ async function embedImages(urls){
   if(!/^https?:$/.test(location.protocol))return urls;
   const out=await Promise.all(urls.slice(0,10).map(async u=>{
     try{const b=await fetchImg(u);if(!/^image\//.test(b.type))throw 0;
-      return await toJpeg(URL.createObjectURL(b))}catch(e){return null}}));
+      return await toJpeg(URL.createObjectURL(b))}catch(e){return u}})); // repli : lien direct vers l'image (affichage seulement)
   return out.filter(Boolean);
 }
 
