@@ -171,6 +171,12 @@ function parseHTML(html,base){
     const ss=i.getAttribute('srcset')||i.getAttribute('data-srcset');
     if(ss){u=ss.split(',').map(x=>x.trim().split(/\s+/)[0]).pop()||u}
     addImg(u)});
+  // <picture><source srcset>, attributs lazy-load courants
+  root.querySelectorAll('source[srcset],source[data-srcset],[data-background],[data-bg],[data-lazy-src],[data-original]').forEach(e=>{
+    const v=e.getAttribute('srcset')||e.getAttribute('data-srcset')||e.getAttribute('data-background')||e.getAttribute('data-bg')||e.getAttribute('data-lazy-src')||e.getAttribute('data-original')||'';
+    const u=v.split(',').map(x=>x.trim().split(/\s+/)[0]).filter(Boolean).pop();if(u)addImg(u)});
+  // dernier recours : toute URL d'image présente dans le code (JSON, styles, scripts)
+  (html.replace(/\\\//g,'/').match(/https?:\/\/[^"'\s()<>\\]+?\.(?:jpe?g|png|webp)(?:\?[^"'\s()<>\\]*)?/gi)||[]).forEach(addImg);
   // dédoublonnage par nom de fichier
   const seen=new Set();m.images=imgs.filter(u=>{const k=u.split('?')[0].split('/').pop().replace(/\.\w+$/,'').toLowerCase();if(seen.has(k))return false;seen.add(k);return true});
   // nettoyage du bruit
