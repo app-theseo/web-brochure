@@ -57,8 +57,9 @@ h1.t{font-size:44px}h2.t{font-size:34px}
 .dots{display:flex;gap:5px}.dots i{width:13px;height:13px;border-radius:50%;background:var(--red);display:block}
 .cover{background:var(--navy);color:#fff}
 .cover .shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,31,58,.2),rgba(11,31,58,.92) 70%)}
-.cover .in{position:relative;z-index:2;margin-top:auto;padding:60px 56px 70px}
-.cover h1{font-size:54px;line-height:1.06;margin:14px 0 16px;letter-spacing:-1.5px}
+.cover .in{position:absolute;z-index:2;left:45px;right:60px;top:470px}
+.cover .site{position:absolute;z-index:2;right:53px;bottom:20px;font-size:26px}
+.cover h1{font-size:54px;line-height:1.06;margin:14px 0 16px;letter-spacing:-1.5px;font-weight:400}
 .cover .kick{color:#c4b5fd;letter-spacing:2px;font-size:12px;font-weight:700;text-transform:uppercase}
 .cover .sub2{font-size:19px;opacity:.9;max-width:560px}
 .cover .logo{position:relative;z-index:2;padding:40px 56px 0;display:flex;align-items:center;gap:10px;font-weight:700;font-size:20px}
@@ -136,6 +137,7 @@ h1.t{font-size:44px}h2.t{font-size:34px}
 </div>
 
 <script src="lib/qrcode.min.js"></script>
+<script src="lib/cover-bg.js"></script>
 <script src="lib/pptxgen.min.js"></script>
 <script src="lib/jszip.min.js"></script>
 <script>
@@ -275,9 +277,11 @@ const fig=s=>`<div class="fig"><div class="v" contenteditable>${esc(s.v)}</div><
 const quoteBox=q=>q?`<div class="quote"><div class="qt" contenteditable>« ${esc(q.q)} »</div>${q.by?`<div class="qb">${esc(q.by)}</div>`:''}</div>`:'';
 
 function cover(m){
-  return `<section class="page cover" data-name="Couverture">${imgDiv('hero','position:absolute;inset:0;opacity:.55;')}<div class="shade"></div>
-  <div class="logo"><div class="dots"><i></i><i></i><i></i></div><span>${esc(BR)}</span></div>
-  <div class="in"><div class="kick" contenteditable>${esc(m.kicker||'Trend report')}</div><h1 contenteditable>${esc(m.title)}</h1><div class="sub2" contenteditable>${esc(m.subtitle)}</div></div></section>`;
+  IMGDIM.set(COVER_BG,{w:1240,h:1754});
+  const n=m.title.length,fs=n<=14?96:n<=30?66:n<=60?50:n<=100?40:34;
+  return `<section class="page cover" data-name="Couverture"><div class="img cover-bg" data-slot="cover" style="position:absolute;inset:0;background-image:url('${COVER_BG}')"></div>
+  <div class="in"><div class="kick" contenteditable>${esc(m.kicker||'')}</div><h1 contenteditable style="font-size:${fs}px">${esc(m.title)}</h1><div class="sub2" contenteditable>${esc(m.subtitle)}</div></div>
+  <div class="site" contenteditable>www.securitastechnology.com</div></section>`;
 }
 function toc(m,items){
   const li=items.slice(0,8).map((it,i)=>`<li><span class="n">${String(i+1).padStart(2,'0')}</span><span contenteditable>${esc(it.h)}</span><span class="p">p. ${it.p}</span></li>`).join('');
