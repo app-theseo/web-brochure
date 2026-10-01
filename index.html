@@ -240,7 +240,7 @@ function toJpeg(src){return new Promise((res,rej)=>{
     const d=c.toDataURL('image/jpeg',.85);IMGDIM.set(d,{w:c.width,h:c.height});res(d)};
   i.onerror=rej;i.src=src})}
 async function embedImages(urls){
-  if(location.protocol!=='http:')return urls;
+  if(!/^https?:$/.test(location.protocol))return urls;
   const out=await Promise.all(urls.slice(0,10).map(async u=>{
     try{const r=await fetch('/img?url='+encodeURIComponent(u));if(!r.ok)throw 0;
       const b=await r.blob();if(!/^image\//.test(b.type))throw 0;
@@ -412,7 +412,7 @@ function exportDoc(){
 $('#xHTML').onclick=()=>download(new Blob([exportDoc()],{type:'text/html'}),'brochure.html');
 $('#xPDF').onclick=async()=>{
   if(!$('#pages').children.length)return;
-  if(location.protocol!=='http:')return window.print();
+  if(!/^https?:$/.test(location.protocol))return window.print();
   status('Génération du PDF…');
   try{const r=await fetch('/pdf',{method:'POST',body:exportDoc()});if(!r.ok)throw 0;download(await r.blob(),'brochure.pdf');status('PDF généré')}
   catch(e){status('');window.print()}
@@ -605,7 +605,7 @@ $('#zoom').oninput=e=>document.documentElement.style.setProperty('--zoom',e.targ
 $('#blank').onclick=()=>{$('#url').value='';$('#src').value='# Titre de la brochure\n\nAccroche ou résumé du contenu à venir.\n\n## Section 1\n\nTexte de la section 1.\n\n## Section 2\n\nTexte de la section 2.';render()};
 $('#fetch').onclick=async()=>{
   const u=$('#url').value.trim();if(!u)return;
-  if(location.protocol!=='http:'){alert("Pour charger une URL, lancez le serveur local : python serveur.py (puis http://localhost:8765).");return}
+  if(!/^https?:$/.test(location.protocol)){alert("Pour charger une URL, lancez le serveur local : python serveur.py (puis http://localhost:8765).");return}
   status('Chargement de la page…');
   try{const r=await fetch('/proxy?url='+encodeURIComponent(u));if(!r.ok)throw 0;$('#src').value=await r.text();await render()}
   catch(e){status('');alert("Impossible de récupérer la page (bloquée, ou chargée en JavaScript). Collez son code HTML dans la zone de texte.")}

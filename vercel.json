@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/proxy", "destination": "/api/proxy" },
+    { "source": "/img", "destination": "/api/img" }
+  ]
+}
