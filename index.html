@@ -232,6 +232,13 @@ function finalize(m){
   if(m.subtitle.length>160)m.subtitle=m.subtitle.slice(0,157).replace(/\s\S*$/,'')+'…';
 }
 
+/* --- accès réseau : serveur du site d'abord, puis proxys publics en secours --- */
+const PROXIES=[u=>'/proxy?url='+encodeURIComponent(u),u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),u=>'https://corsproxy.io/?url='+encodeURIComponent(u)];
+async function viaProxies(u,read,ok){
+  for(const p of PROXIES){try{const r=await fetch(p(u));if(!r.ok)continue;const v=await read(r);if(ok(v))return v}catch(e){}}
+  throw 0}
+const fetchPage=u=>viaProxies(u,r=>r.text(),t=>/<(html|body|p|h1|div)\b/i.test(t));
+const fetchImg=u=>viaProxies(u,r=>r.blob(),b=>/^image\//.test(b.type));
 /* ================= 2. IMAGES (téléchargées via le serveur, converties en JPEG) ================= */
 function toJpeg(src){return new Promise((res,rej)=>{
   const i=new Image();i.crossOrigin='anonymous';
@@ -242,8 +249,7 @@ function toJpeg(src){return new Promise((res,rej)=>{
 async function embedImages(urls){
   if(!/^https?:$/.test(location.protocol))return urls;
   const out=await Promise.all(urls.slice(0,10).map(async u=>{
-    try{const r=await fetch('/img?url='+encodeURIComponent(u));if(!r.ok)throw 0;
-      const b=await r.blob();if(!/^image\//.test(b.type))throw 0;
+    try{const b=await fetchImg(u);if(!/^image\//.test(b.type))throw 0;
       return await toJpeg(URL.createObjectURL(b))}catch(e){return null}}));
   return out.filter(Boolean);
 }
@@ -607,7 +613,7 @@ $('#fetch').onclick=async()=>{
   const u=$('#url').value.trim();if(!u)return;
   if(!/^https?:$/.test(location.protocol)){alert("Chargement d'URL indisponible ici : collez le contenu dans la zone de texte.");return}
   status('Chargement de la page…');
-  try{const r=await fetch('/proxy?url='+encodeURIComponent(u));if(!r.ok)throw 0;$('#src').value=await r.text();await render()}
+  try{$('#src').value=await fetchPage(u);await render()}
   catch(e){status('');alert("Impossible de récupérer la page (bloquée, ou chargée en JavaScript). Collez son code HTML dans la zone de texte.")}
 };
 $('#sample').onclick=()=>{$('#url').value='https://exemple.securitas.com/trend-report';$('#src').value=SAMPLE;render()};
