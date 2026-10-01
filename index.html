@@ -106,8 +106,9 @@ h1.t{font-size:44px}h2.t{font-size:34px}
   <div class="sub">MVP · templates A4 · version simple ou détaillée</div>
 
   <label>1. Source</label>
-  <div class="row"><input type="text" id="url" placeholder="https://… (nécessite python serveur.py)"><button id="fetch">Récupérer</button></div>
+  <div class="row"><input type="text" id="url" placeholder="https://… (adresse de la page web)"><button id="fetch">Récupérer</button></div>
   <div class="hint">Ou collez le texte / le code HTML de la page ci-dessous.</div>
+  <div class="hint" id="bm" style="margin-top:6px">Un site bloque la récupération (erreur 403) ? Glissez ce bouton dans votre barre de favoris : <a id="bmlink" href="#" style="display:inline-block;padding:2px 8px;border:1px solid var(--line,#ccc);border-radius:10px;text-decoration:none;color:inherit;cursor:grab" title="Glissez-moi dans la barre de favoris">📎 Envoyer vers Brochure</a>, puis cliquez dessus quand vous êtes sur la page du site.</div>
   <textarea id="src" placeholder="Texte (# Titre, ## Section, - puces, > citation — Auteur) ou HTML complet"></textarea>
   <div class="row" style="margin-top:6px"><button id="sample">Exemple</button><button id="blank">Template vide</button></div>
 
@@ -650,11 +651,21 @@ $('#fetch').onclick=async()=>{
   status('Chargement de la page…');
   let html;
   try{html=await fetchPage(u)}
-  catch(e){status('');alert("Impossible de récupérer la page ("+(e.message||'bloquée')+"). Collez son code HTML dans la zone de texte.");return}
+  catch(e){status('');alert("Impossible de récupérer la page ("+(e.message||'bloquée')+"). Utilisez le bouton « Envoyer vers Brochure » (favori) sur la page du site, ou collez son code HTML dans la zone de texte.");return}
   $('#src').value=html;
   try{await render()}
   catch(e){status('');console.error(e);alert("Page récupérée mais analyse impossible : "+(e.message||e))}
 };
+/* --- favori « Envoyer vers Brochure » : la page est lue dans le navigateur de l'utilisateur (contourne les blocages 403) --- */
+(()=>{
+  const code="(()=>{const w=window.open('"+location.origin+"/');const h=document.documentElement.outerHTML,u=location.href;const t=setInterval(()=>{try{w.postMessage({brochure:1,html:h,url:u},'*')}catch(e){}},500);addEventListener('message',e=>{if(e.data==='brochure-ok'){clearInterval(t)}});setTimeout(()=>clearInterval(t),30000)})()";
+  const a=$('#bmlink');if(a&&/^https?:$/.test(location.protocol))a.href='javascript:'+encodeURIComponent(code);
+  addEventListener('message',e=>{
+    const d=e.data;if(!d||d.brochure!==1||typeof d.html!=='string')return;
+    if(e.source)e.source.postMessage('brochure-ok','*');
+    if($('#src').value===d.html)return;
+    $('#url').value=String(d.url||'');$('#src').value=d.html;render()});
+})();
 $('#sample').onclick=()=>{$('#url').value='https://exemple.securitas.com/trend-report';$('#src').value=SAMPLE;render()};
 const SAMPLE=`# Sécuriser l'essentiel : les nouvelles règles de la sécurité des infrastructures critiques
 
