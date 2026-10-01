@@ -103,7 +103,7 @@ h1.t{font-size:44px}h2.t{font-size:34px}
 <body>
 <aside id="side">
   <h1>Web → Brochure</h1>
-  <div class="sub">MVP · templates A4 5 &amp; 10 pages</div>
+  <div class="sub">MVP · templates A4 · version simple ou détaillée</div>
 
   <label>1. Source</label>
   <div class="row"><input type="text" id="url" placeholder="https://… (nécessite python serveur.py)"><button id="fetch">Récupérer</button></div>
@@ -112,7 +112,7 @@ h1.t{font-size:44px}h2.t{font-size:34px}
   <div class="row" style="margin-top:6px"><button id="sample">Exemple</button><button id="blank">Template vide</button></div>
 
   <label>2. Format</label>
-  <div class="seg" id="fmt"><button data-n="5" class="on">5 pages · synthèse</button><button data-n="10">10 pages · standard</button></div>
+  <div class="seg" id="fmt"><button data-n="S" class="on">Version simple</button><button data-n="D">Version détaillée</button></div>
 
   <label>3. Charte</label>
   <div class="row"><input type="color" id="cAcc" value="#8b5cf6" title="Accent"><input type="color" id="cNavy" value="#0b1f3a" title="Fond / titres"><input type="text" id="brand" value="Securitas" title="Marque"></div>
@@ -141,7 +141,7 @@ h1.t{font-size:44px}h2.t{font-size:34px}
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const status=t=>$('#status').textContent=t||'';
-let FORMAT=5, userImgs={}, IMGDIM=new Map(), LAST=null;
+let FORMAT='S', userImgs={}, IMGDIM=new Map(), LAST=null;
 const clean=t=>t.replace(/[ \s]+/g,' ').trim();
 
 /* ================= 1. EXTRACTION ================= */
@@ -324,45 +324,72 @@ function pullQuote(m){
   const c=t.split(/(?<=[.!?])\s+/).filter(s=>s.length>=60&&s.length<=170);
   return c.length?{q:c.sort((a,b)=>a.length-b.length)[Math.floor(c.length/2)],by:''}:{q:'Citation à mettre en avant : une phrase forte tirée du contenu.',by:'Nom, fonction'};
 }
-function build(m0,n){
+function build(m0,mode){
   slot=0;imgPool=[...m0.images];BR=$('#brand').value||'Securitas';
+  const detailed=mode==='D';
   const m=JSON.parse(JSON.stringify(m0));
   let S=[...m.sections],cs=null,cards=null;
-  const ci=n===10?S.findIndex(s=>/cas|case|témoignage/i.test(s.h)&&S.length>3):-1;if(ci>=0)cs=S.splice(ci,1)[0];
-  // plan des pages
-  const plan=n===5?['cover','toc','art:hero','art:quote','back']
-    :['cover','toc','art:hero','art:quote','quote','art:case','cards','art:hero',m.stats.length>1?'figs':'art:hero','back'];
-  if(n===10){ // page « à retenir » : liste d'avantages, sinon dernières sections en étapes
+  if(detailed){
+    // étude de cas : section dédiée si elle existe
+    const ci=S.findIndex(s=>/cas|case|témoignage/i.test(s.h)&&S.length>3);if(ci>=0)cs=S.splice(ci,1)[0];
+    // page « à retenir » : liste d'avantages, sinon section la plus riche en puces, sinon rien
     const ai=S.findIndex(s=>/avantage|bénéfice|atout|points? cl/i.test(s.h)&&s.blocks.some(b=>b.t==='ul'));
-    if(ai>=0){const s=S.splice(ai,1)[0];cards={h:s.h,items:s.blocks.filter(b=>b.t==='ul').flatMap(b=>b.items)}}
+    const take=s=>({h:s.h,items:s.blocks.filter(b=>b.t==='ul').flatMap(b=>b.items)});
+    if(ai>=0&&S.length>2)cards=take(S.splice(ai,1)[0]);
     else{const li=S.reduce((b,s,i)=>{const l=Math.max(0,...s.blocks.filter(x=>x.t==='ul').map(x=>x.items.length));return l>b.l?{l,i}:b},{l:0,i:-1});
-      if(li.l>=3&&S.length>2){const s=S.splice(li.i,1)[0];cards={h:s.h,items:s.blocks.filter(b=>b.t==='ul').flatMap(b=>b.items)}}
-      else if(S.length>=5){const st=S.splice(-5);cards={h:'En 5 étapes',items:st.map(s=>s.h+' : '+(s.blocks.find(b=>b.t==='p')||{x:''}).x)}}
-      else cards={h:'À retenir',items:['À compléter','À compléter','À compléter','À compléter']}}
+      if(li.l>=3&&S.length>2)cards=take(S.splice(li.i,1)[0])}
   }
-  // répartition des sections sur les pages d'article, proportionnelle à leur capacité
-  const slots=plan.map((t,i)=>({t,i})).filter(x=>x.t.startsWith('art'));
-  const caps=slots.map(s=>(s.t.includes('hero')?CAP.hero:CAP.plain)-(s.t.includes('quote')?500:0)-(s.t.includes('case')?800:0));
-  const tot=S.reduce((a,s)=>a+secLen(s),0),capSum=caps.reduce((a,b)=>a+b,0);
-  const groups=slots.map(()=>[]);let g=0,acc=0;
-  S.forEach(s=>{
-    const target=caps.slice(0,g+1).reduce((a,b)=>a+b,0)/capSum*tot;
-    if(g<slots.length-1&&groups[g].length&&acc+secLen(s)/2>target)g++;
-    groups[g].push(s);acc+=secLen(s)});
   const quotes=[...m.quotes];
-  slots.forEach((s,k)=>{s.d={secs:groups[k],hero:s.t.includes('hero'),quote:s.t.includes('quote')?quotes.shift():null,cs:s.t.includes('case')?(cs||(m.sections.length<3?{h:'Étude de cas à compléter',blocks:[{t:'p',x:'Contexte, solution déployée, résultats.'}]}:null)):null}});
-  const tocItems=slots.map(s=>({h:(s.d.secs[0]||{h:'À compléter'}).h,p:s.i+1}));
-  const out=plan.map((t,i)=>{
+  const tot=S.reduce((a,s)=>a+secLen(s),0);
+  // nombre de pages d'article : selon la quantité de texte réellement disponible
+  const avail=Math.max(0,m.images.length-1);        // la 1re image sert à la couverture
+  let heroLeft=detailed?avail:Math.min(1,avail);
+  const maxA=detailed?5:3;
+  let n=1,cap=heroLeft?CAP.hero:CAP.plain;
+  while(n<maxA&&cap<tot*.95){n++;cap+=CAP.plain}
+  n=Math.min(n,Math.max(1,S.length));
+  let arts=[];
+  for(let k=0;k<n;k++){
+    const q=k===1&&quotes.length&&(detailed||n>1);
+    const hero=heroLeft>0&&(k===0||(detailed&&k%2===0));if(hero)heroLeft--;
+    arts.push('art:'+(hero?'hero':'plain')+(q?':quote':''));
+  }
+  if(cs)arts.push('art:case');
+  let plan,slots,groups;
+  for(;;){
+    const extra=[];
+    if(detailed){
+      if(quotes.length>(arts.some(t=>t.includes('quote'))?1:0)||tot>4500)extra.push('quote');
+      if(cards)extra.push('cards');
+      if(m.stats.length>1)extra.push('figs');
+    }
+    plan=['cover',...(arts.length>=2?['toc']:[]),...arts,...extra,'back'];
+    slots=plan.map((t,i)=>({t,i})).filter(x=>x.t.startsWith('art'));
+    const caps=slots.map(x=>(x.t.includes('hero')?CAP.hero:CAP.plain)-(x.t.includes('quote')?500:0)-(x.t.includes('case')?800:0));
+    const capSum=caps.reduce((a,b)=>a+b,0);
+    groups=slots.map(()=>[]);let g=0,acc=0;
+    S.forEach(sc=>{
+      const target=caps.slice(0,g+1).reduce((a,b)=>a+b,0)/capSum*tot;
+      if(g<slots.length-1&&groups[g].length&&acc+secLen(sc)/2>target)g++;
+      groups[g].push(sc);acc+=secLen(sc)});
+    // pas de page vide : on retire les pages d'article sans contenu
+    const empty=groups.findIndex((gr,k)=>!gr.length&&!(slots[k].t.includes('case')&&cs));
+    if(empty<0||slots.length<=1)break;
+    arts.splice(arts.indexOf(slots[empty].t),1);
+  }
+  const qq=[...quotes];
+  slots.forEach((sl,k)=>{sl.d={secs:groups[k],hero:sl.t.includes('hero'),quote:sl.t.includes('quote')?qq.shift():null,cs:sl.t.includes('case')?cs:null}});
+  const tocItems=slots.map(sl=>({h:(sl.d.secs[0]||sl.d.cs||{h:'Étude de cas'}).h,p:sl.i+1}));
+  return plan.map((t,i)=>{
     const p=i+1;
     if(t==='cover')return cover(m);
     if(t==='toc')return toc(m,tocItems);
-    if(t==='quote')return quotePage(m,p,quotes.shift()||pullQuote(m));
+    if(t==='quote')return quotePage(m,p,qq.shift()||pullQuote(m));
     if(t==='cards')return cardsPage(m,p,cards);
     if(t==='figs')return figuresPage(m,p);
     if(t==='back')return back(m,p);
-    return article(m,slots.find(s=>s.i===i).d,p);
+    return article(m,slots.find(sl=>sl.i===i).d,p);
   });
-  return out;
 }
 
 /* ================= 5. RENDU + DÉBORDEMENT ================= */
@@ -413,7 +440,7 @@ function report(m,trimmed){
   <div class="k"><span>Citations</span><span>${m.quotes.length}</span></div>
   <div class="k"><span>Chiffres clés</span><span>${m.stats.length}</span></div>
   <div class="k"><span>Texte tronqué (débordement)</span><span class="${trimmed?'warn':'ok'}">${trimmed} car.</span></div>
-  <div class="hint" style="margin-top:8px">${trimmed?'⚠ Contenu trop long pour ce format : passer à 10 pages ou condenser. ':''}${emb===0?'Aucune image : cliquez sur un bloc image pour en ajouter. ':''}${m.sections.length<3?'Contenu court : des zones « à compléter » ont été insérées.':''}</div>`;
+  <div class="hint" style="margin-top:8px">${trimmed?'⚠ Contenu trop long pour ce format : passer en version détaillée ou condenser. ':''}${emb===0?'Aucune image : cliquez sur un bloc image pour en ajouter. ':''}${m.sections.length<3?'Contenu court : des zones « à compléter » ont été insérées.':''}</div>`;
 }
 
 /* ================= 6. EXPORTS ================= */
@@ -614,7 +641,7 @@ $('#xIDML').onclick=async()=>{
 
 /* ================= 7. UI ================= */
 $('#go').onclick=render;
-$('#fmt').onclick=e=>{const b=e.target.closest('button');if(!b)return;FORMAT=+b.dataset.n;[...$('#fmt').children].forEach(x=>x.classList.toggle('on',x===b));render()};
+$('#fmt').onclick=e=>{const b=e.target.closest('button');if(!b)return;FORMAT=b.dataset.n;[...$('#fmt').children].forEach(x=>x.classList.toggle('on',x===b));render()};
 $('#zoom').oninput=e=>document.documentElement.style.setProperty('--zoom',e.target.value/100);
 $('#blank').onclick=()=>{$('#url').value='';$('#src').value='# Titre de la brochure\n\nAccroche ou résumé du contenu à venir.\n\n## Section 1\n\nTexte de la section 1.\n\n## Section 2\n\nTexte de la section 2.';render()};
 $('#fetch').onclick=async()=>{
