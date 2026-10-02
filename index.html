@@ -637,7 +637,7 @@ $('#xIDML').onclick=async()=>{
     const base=await JSZip.loadAsync(IDML_BASE,{base64:true});
     const zip=new JSZip();zip.file('mimetype','application/vnd.adobe.indesign-idml-package',{compression:'STORE'});
     const put=(n,d,o)=>zip.file(n,d,{createFolders:false,...(o||{})});
-    const spreadFiles=[],storyFiles=[],storyIds=[];let uid=5000,linkN=0;
+    const spreadFiles=[],storyFiles=[],storyIds=[],imgs=[];let uid=5000,linkN=0;
     const U=()=>'u'+(uid++);
     specs.forEach((items,pi)=>{
       let body='';const sid='sp'+(pi+1);
@@ -649,9 +649,9 @@ $('#xIDML').onclick=async()=>{
         }else if(it.k==='img'&&it.data){
           const d=IMGDIM.get(it.data)||{w:it.w*3,h:it.h*3};linkN++;
           const fn=`img${linkN}.${it.data.startsWith('data:image/png')?'png':'jpg'}`;
-          const b64=it.data.split(',')[1];
+          imgs.push([fn,it.data.split(',')[1]]);
           const sc=Math.max((r-l)/d.w,(b-t)/d.h),tx=l+((r-l)-d.w*sc)/2,ty=t+((b-t)-d.h*sc)/2;
-          body+=`<Rectangle Self="${U()}" ContentType="GraphicType" ItemLayer="ub8" FillColor="Swatch/None" StrokeColor="Swatch/None" StrokeWeight="0" ItemTransform="1 0 0 1 0 0">${path(l,t,r,b)}<Image Self="${U()}" ItemTransform="${sc.toFixed(5)} 0 0 ${sc.toFixed(5)} ${tx.toFixed(3)} ${ty.toFixed(3)}"><Properties><GraphicBounds Left="0" Top="0" Right="${d.w}" Bottom="${d.h}"/></Properties><Link Self="${U()}" LinkResourceURI="file:${fn}" LinkResourceFormat="$ID/${fn.endsWith('png')?'PNG':'JPEG'}" StoredState="Embedded"/><Contents><![CDATA[${b64}]]></Contents></Image></Rectangle>`;
+          body+=`<Rectangle Self="${U()}" ContentType="GraphicType" ItemLayer="ub8" FillColor="Swatch/None" StrokeColor="Swatch/None" StrokeWeight="0" ItemTransform="1 0 0 1 0 0">${path(l,t,r,b)}<Image Self="${U()}" ItemTransform="${sc.toFixed(5)} 0 0 ${sc.toFixed(5)} ${tx.toFixed(3)} ${ty.toFixed(3)}"><Properties><GraphicBounds Left="0" Top="0" Right="${d.w}" Bottom="${d.h}"/></Properties><Link Self="${U()}" LinkResourceURI="file:Links/${fn}" LinkResourceFormat="$ID/${fn.endsWith('png')?'PNG':'JPEG'}"/></Image></Rectangle>`;
         }else if(it.k==='text'){
           const stId='st'+(uid++);storyIds.push(stId);
           const ps=it.paras.map((p,i)=>{
@@ -683,7 +683,15 @@ $('#xIDML').onclick=async()=>{
     storyFiles.forEach(s=>put(`Stories/Story_${s[0]}.xml`,s[1]));
     // contrôle de forme XML
     for(const [n,f] of Object.entries(zip.files)){if(!n.endsWith('.xml'))continue;const t=await f.async('string');const e=new DOMParser().parseFromString(t,'application/xml').querySelector('parsererror');if(e)throw new Error('XML invalide : '+n)}
-    download(await zip.generateAsync({type:'blob',compression:'DEFLATE',mimeType:'application/vnd.adobe.indesign-idml-package'}),'brochure.idml');status('Fichier InDesign généré');
+    const idml=await zip.generateAsync({type:'blob',compression:'DEFLATE',mimeType:'application/vnd.adobe.indesign-idml-package'});
+    if(!imgs.length){download(idml,'brochure.idml')}
+    else{ // images à côté du fichier : dossier Links, à garder dans le même dossier que le .idml
+      const pk=new JSZip();pk.file('brochure.idml',idml);
+      imgs.forEach(([fn,b])=>pk.file('Links/'+fn,b,{base64:true}));
+      pk.file('LISEZMOI.txt','1. Décompressez ce dossier (ne déplacez pas les fichiers séparément).\r\n2. Ouvrez brochure.idml dans InDesign.\r\n3. Si InDesign signale des liens manquants : Fenêtre > Liens, sélectionnez les images, puis menu du panneau > « Relier au dossier… » et choisissez le dossier Links.\r\n4. Enregistrez sous… .indd.');
+      download(await pk.generateAsync({type:'blob',compression:'DEFLATE'}),'brochure-indesign.zip');
+    }
+    status('Fichier InDesign généré');
   }catch(e){console.error(e);status('Erreur INDD : '+e.message)}
 };
 
