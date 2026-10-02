@@ -410,26 +410,57 @@ async function render(){
   const host=$('#pages');host.innerHTML=pages.map((h,i)=>`<div class="wrap"><div class="tag">${i+1} · ${h.match(/data-name="([^"]+)"/)[1]}</div>${h}</div>`).join('');
   $('#empty').style.display='none';
   let trimmed=0;
-  host.querySelectorAll('.wrap').forEach(w=>{
-    let cut=0;
+  const over=el=>el.scrollHeight>el.clientHeight+1||el.scrollWidth>el.clientWidth+1;
+  const wraps=[...host.querySelectorAll('.wrap')];
+  for(let wi=0;wi<wraps.length&&wi<40;wi++){
+    const w=wraps[wi];let cut=0;
     // contenu court : agrandir le corps de texte tant que ça tient
     w.querySelectorAll('.fit').forEach(el=>{
-      if(el.closest('.case'))return;
-      const ov=()=>el.scrollHeight>el.clientHeight+1||el.scrollWidth>el.clientWidth+1;
-      for(let fs=12.5;fs<=17;fs+=.5){el.style.fontSize=fs+'px';if(ov()){el.style.fontSize=(fs-.5)+'px';break}}
-      if(ov())el.style.fontSize='';
+      if(el.closest('.case')||w.dataset.cont)return;
+      for(let fs=12.5;fs<=17;fs+=.5){el.style.fontSize=fs+'px';if(over(el)){el.style.fontSize=(fs-.5)+'px';break}}
+      if(over(el))el.style.fontSize='';
     });
     w.querySelectorAll('.fit').forEach(el=>{
-      for(let g=0;g<600&&(el.scrollHeight>el.clientHeight+1||el.scrollWidth>el.clientWidth+1);g++){
+      const carry=[];
+      for(let g=0;g<600&&over(el);g++){
         const last=[...el.querySelectorAll('p,li,h3')].pop();if(!last)break;
-        if(last.tagName==='H3'){last.remove();continue}
+        if(!el.closest('.case')&&el.querySelectorAll('p,li,h3').length>1){
+          // débordement : le dernier bloc passe sur une page de suite (rien n'est supprimé)
+          if(last.tagName==='LI'){
+            const ul=last.parentElement;
+            let u=carry[0]&&carry[0].tagName==='UL'?carry[0]:null;
+            if(!u){u=document.createElement('ul');carry.unshift(u)}
+            u.prepend(last);if(!ul.children.length)ul.remove();
+          }else carry.unshift(last);
+          continue;
+        }
+        // dernier recours (un seul bloc trop long, ou encadré « case study ») : on coupe
         const ss=last.textContent.split(/(?<=[.!?])\s+/);
         if(ss.length>1&&last.tagName==='P'){const l=ss.pop();cut+=l.length;last.textContent=ss.join(' ')}
         else{cut+=last.textContent.length;const ul=last.parentElement;last.remove();if(ul&&ul.tagName==='UL'&&!ul.children.length)ul.remove()}
       }
+      if(carry.length){
+        const sec=w.querySelector('section');
+        const title=(w.querySelector('h2.t')||{textContent:''}).textContent.trim();
+        const nw=document.createElement('div');nw.className='wrap';nw.dataset.cont='1';
+        nw.innerHTML=`<div class="tag"></div><section class="page" data-name="Article">${runHead(m,0)}<div class="pad"><h2 class="t" contenteditable>${esc(title)} <span style="font-weight:400;opacity:.6">(suite)</span></h2><div class="fit c2"></div></div></section>`;
+        w.after(nw);nw.querySelector('.fit').append(...carry);
+        wraps.splice(wi+1,0,nw);
+      }
     });
     trimmed+=cut;
     if(cut){const f=document.createElement('div');f.className='flag';f.textContent=`${cut} car. tronqués`;w.appendChild(f)}
+  }
+  // numérotation des pages et du sommaire après ajout éventuel de pages de suite
+  const all=[...host.querySelectorAll('.wrap')];
+  all.forEach((w,i)=>{
+    const t=w.querySelector('.tag');if(t)t.textContent=`${i+1} · ${w.querySelector('section').dataset.name}`;
+    const r=w.querySelector('.run>span:last-child');if(r)r.textContent=String(i+1);
+  });
+  host.querySelectorAll('.toc li').forEach(li=>{
+    const h=(li.children[1]||{textContent:''}).textContent.trim();
+    const k=all.findIndex(w=>{const e=w.querySelector('h2.t');return e&&e.firstChild&&e.firstChild.textContent.trim()===h});
+    if(k>=0)li.querySelector('.p').textContent='p. '+(k+1);
   });
   host.querySelectorAll('.qr').forEach(q=>{try{if(m.url){const c=qrcode(0,'M');c.addData(m.url);c.make();q.innerHTML=c.createSvgTag(4,0)}else q.innerHTML='<div style="color:#999;font-size:10px;padding-top:40px">QR</div>'}catch(e){}});
   host.onclick=e=>{const d=e.target.closest('.img');if(!d)return;const f=document.createElement('input');f.type='file';f.accept='image/*';
