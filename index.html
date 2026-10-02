@@ -138,6 +138,7 @@ h1.t{font-size:44px}h2.t{font-size:34px}
 
 <script src="lib/qrcode.min.js"></script>
 <script src="lib/cover-bg.js"></script>
+<script src="lib/idml-base.js"></script>
 <script src="lib/pptxgen.min.js"></script>
 <script src="lib/jszip.min.js"></script>
 <script>
@@ -633,8 +634,10 @@ $('#xIDML').onclick=async()=>{
           `<PathPointType Anchor="${l} ${cy}" LeftDirection="${l} ${cy+ry*q}" RightDirection="${l} ${cy-ry*q}"/>`].join('')}</PathPointArray></GeometryPathType></PathGeometry></Properties>`}
       const p=(a,bb)=>`<PathPointType Anchor="${a} ${bb}" LeftDirection="${a} ${bb}" RightDirection="${a} ${bb}"/>`;
       return `<Properties><PathGeometry><GeometryPathType PathOpen="false"><PathPointArray>${p(l,t)}${p(l,b)}${p(r,b)}${p(r,t)}</PathPointArray></GeometryPathType></PathGeometry></Properties>`};
+    const base=await JSZip.loadAsync(IDML_BASE,{base64:true});
     const zip=new JSZip();zip.file('mimetype','application/vnd.adobe.indesign-idml-package',{compression:'STORE'});
-    const spreadFiles=[],storyFiles=[],storyIds=[];let uid=100,linkN=0;
+    const put=(n,d,o)=>zip.file(n,d,{createFolders:false,...(o||{})});
+    const spreadFiles=[],storyFiles=[],storyIds=[];let uid=5000,linkN=0;
     const U=()=>'u'+(uid++);
     specs.forEach((items,pi)=>{
       let body='';const sid='sp'+(pi+1);
@@ -642,36 +645,45 @@ $('#xIDML').onclick=async()=>{
         const l=+X(it.x),t=+Y(it.y),r=+X(it.x+it.w),b=+Y(it.y+it.h);
         if(it.k==='rect'){
           if(it.w<=0||it.h<=0)return;
-          body+=`<${it.round?'Oval':'Rectangle'} Self="${U()}" ContentType="GraphicType" ItemLayer="ul" FillColor="${col(it.fill)}" FillTint="${100-(it.tr||0)}" StrokeColor="Swatch/None" StrokeWeight="0" ItemTransform="1 0 0 1 0 0">${path(l,t,r,b,it.round)}</${it.round?'Oval':'Rectangle'}>`;
+          body+=`<${it.round?'Oval':'Rectangle'} Self="${U()}" ContentType="GraphicType" ItemLayer="ub8" FillColor="${col(it.fill)}" FillTint="${100-(it.tr||0)}" StrokeColor="Swatch/None" StrokeWeight="0" ItemTransform="1 0 0 1 0 0">${path(l,t,r,b,it.round)}</${it.round?'Oval':'Rectangle'}>`;
         }else if(it.k==='img'&&it.data){
           const d=IMGDIM.get(it.data)||{w:it.w*3,h:it.h*3};linkN++;
           const fn=`img${linkN}.${it.data.startsWith('data:image/png')?'png':'jpg'}`;
-          zip.file('Links/'+fn,it.data.split(',')[1],{base64:true,createFolders:false});
+          put('Links/'+fn,it.data.split(',')[1],{base64:true});
           const sc=Math.max((r-l)/d.w,(b-t)/d.h),tx=l+((r-l)-d.w*sc)/2,ty=t+((b-t)-d.h*sc)/2;
-          body+=`<Rectangle Self="${U()}" ContentType="GraphicType" ItemLayer="ul" FillColor="Swatch/None" StrokeColor="Swatch/None" StrokeWeight="0" ItemTransform="1 0 0 1 0 0">${path(l,t,r,b)}<Image Self="${U()}" ItemTransform="${sc.toFixed(5)} 0 0 ${sc.toFixed(5)} ${tx.toFixed(3)} ${ty.toFixed(3)}"><Properties><GraphicBounds Left="0" Top="0" Right="${d.w}" Bottom="${d.h}"/></Properties><Link Self="${U()}" LinkResourceURI="file:Links/${fn}" LinkResourceFormat="$ID/${fn.endsWith('png')?'PNG':'JPEG'}"/></Image></Rectangle>`;
+          body+=`<Rectangle Self="${U()}" ContentType="GraphicType" ItemLayer="ub8" FillColor="Swatch/None" StrokeColor="Swatch/None" StrokeWeight="0" ItemTransform="1 0 0 1 0 0">${path(l,t,r,b)}<Image Self="${U()}" ItemTransform="${sc.toFixed(5)} 0 0 ${sc.toFixed(5)} ${tx.toFixed(3)} ${ty.toFixed(3)}"><Properties><GraphicBounds Left="0" Top="0" Right="${d.w}" Bottom="${d.h}"/></Properties><Link Self="${U()}" LinkResourceURI="file:Links/${fn}" LinkResourceFormat="$ID/${fn.endsWith('png')?'PNG':'JPEG'}"/></Image></Rectangle>`;
         }else if(it.k==='text'){
           const stId='st'+(uid++);storyIds.push(stId);
           const ps=it.paras.map((p,i)=>{
             const al=p.align==='center'?'CenterAlign':p.align==='right'?'RightAlign':'LeftAlign';
             const runs=p.runs.map((r,j)=>`<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" PointSize="${(r.size*k).toFixed(2)}" Leading="${(p.lh*k).toFixed(2)}" FillColor="${col(r.color)}" FontStyle="${r.bold?(r.italic?'Bold Italic':'Bold'):(r.italic?'Italic':'Regular')}"><Properties><AppliedFont type="string">${x(r.font)}</AppliedFont></Properties><Content>${j===0&&p.bullet?'• ':''}${x(r.t)}</Content>${j===p.runs.length-1&&i<it.paras.length-1?'<Br/>':''}</CharacterStyleRange>`).join('');
             return `<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/$ID/NormalParagraphStyle" Justification="${al}" SpaceAfter="${((p.after||0)*k).toFixed(2)}">${runs}</ParagraphStyleRange>`}).join('');
-          storyFiles.push([stId,`${HDR}<idPkg:Story ${NS} DOMVersion="8.0"><Story Self="${stId}" AppliedTOCStyle="n" TrackChanges="false" StoryTitle="$ID/" AppliedNamedGrid="n"><StoryPreference OpticalMarginAlignment="false" OpticalMarginSize="12" FrameType="TextFrameType" StoryOrientation="Horizontal" StoryDirection="LeftToRightDirection"/>${ps}</Story></idPkg:Story>`]);
-          body+=`<TextFrame Self="${U()}" ParentStory="${stId}" ContentType="TextType" ItemLayer="ul" FillColor="Swatch/None" StrokeColor="Swatch/None" StrokeWeight="0" ItemTransform="1 0 0 1 0 0">${path(l,t,r,b)}<TextFramePreference TextColumnCount="1" TextColumnGutter="0" VerticalJustification="${it.valign==='middle'?'CenterAlign':'TopAlign'}"><Properties><InsetSpacing type="list"><ListItem type="unit">0</ListItem><ListItem type="unit">0</ListItem><ListItem type="unit">0</ListItem><ListItem type="unit">0</ListItem></InsetSpacing></Properties></TextFramePreference></TextFrame>`;
+          storyFiles.push([stId,`${HDR}<idPkg:Story ${NS} DOMVersion="20.0"><Story Self="${stId}" AppliedTOCStyle="n" TrackChanges="false" StoryTitle="$ID/" AppliedNamedGrid="n"><StoryPreference OpticalMarginAlignment="false" OpticalMarginSize="12" FrameType="TextFrameType" StoryOrientation="Horizontal" StoryDirection="LeftToRightDirection"/>${ps}</Story></idPkg:Story>`]);
+          body+=`<TextFrame Self="${U()}" ParentStory="${stId}" ContentType="TextType" ItemLayer="ub8" FillColor="Swatch/None" StrokeColor="Swatch/None" StrokeWeight="0" ItemTransform="1 0 0 1 0 0">${path(l,t,r,b)}<TextFramePreference TextColumnCount="1" TextColumnGutter="0" VerticalJustification="${it.valign==='middle'?'CenterAlign':'TopAlign'}"><Properties><InsetSpacing type="list"><ListItem type="unit">0</ListItem><ListItem type="unit">0</ListItem><ListItem type="unit">0</ListItem><ListItem type="unit">0</ListItem></InsetSpacing></Properties></TextFramePreference></TextFrame>`;
         }
       });
-      spreadFiles.push([sid,`${HDR}<idPkg:Spread ${NS} DOMVersion="8.0"><Spread Self="${sid}" PageCount="1" BindingLocation="0" AllowPageShuffle="true" ShowMasterItems="true" ItemTransform="1 0 0 1 0 0"><Page Self="pg${pi+1}" GeometricBounds="0 0 ${H} ${W}" ItemTransform="1 0 0 1 ${-W/2} ${-H/2}" Name="${pi+1}" AppliedMaster="ma" OverrideList="" TabOrder="" GridStartingPoint="TopOutside" UseMasterGrid="true"><MarginPreference ColumnCount="1" ColumnGutter="0" Top="0" Bottom="0" Left="0" Right="0" ColumnDirection="Horizontal"/></Page>${body}</Spread></idPkg:Spread>`]);
+      spreadFiles.push([sid,`${HDR}<idPkg:Spread ${NS} DOMVersion="20.0"><Spread Self="${sid}" FlattenerOverride="Default" ShowMasterItems="true" PageCount="1" BindingLocation="0" AllowPageShuffle="true" ItemTransform="1 0 0 1 0 0" AppliedMaster="ub9"><Page Self="pg${pi+1}" GeometricBounds="0 0 ${H} ${W}" ItemTransform="1 0 0 1 ${-W/2} ${-H/2}" Name="${pi+1}" AppliedMaster="ub9" OverrideList="" TabOrder="" MasterPageTransform="1 0 0 1 0 0" GridStartingPoint="TopOutside" UseMasterGrid="true"><MarginPreference ColumnCount="1" ColumnGutter="12" Top="0" Bottom="0" Left="0" Right="0" ColumnDirection="Horizontal"/></Page>${body}</Spread></idPkg:Spread>`]);
     });
-    zip.file('designmap.xml',`${HDR}<Document ${NS} DOMVersion="8.0" Self="d" StoryList="${storyIds.join(' ')}" ActiveLayer="ul"><idPkg:Graphic src="Resources/Graphic.xml"/><idPkg:Fonts src="Resources/Fonts.xml"/><idPkg:Styles src="Resources/Styles.xml"/><idPkg:Preferences src="Resources/Preferences.xml"/><Layer Self="ul" Name="Calque 1" Visible="true" Locked="false" IgnoreWrap="false" ShowGuides="true" LockGuides="false" UI="true" Expendable="true" Printable="true"/><idPkg:MasterSpread src="MasterSpreads/MasterSpread_ma.xml"/>${spreadFiles.map(s=>`<idPkg:Spread src="Spreads/Spread_${s[0]}.xml"/>`).join('')}${storyFiles.map(s=>`<idPkg:Story src="Stories/Story_${s[0]}.xml"/>`).join('')}</Document>`);
-    zip.file('Resources/Graphic.xml',`${HDR}<idPkg:Graphic ${NS} DOMVersion="8.0"><Color Self="Color/Black" Model="Process" Space="CMYK" ColorValue="0 0 0 100" ColorOverride="Specialblack" Name="Black"/>${[...colors].map(([h,id])=>{const n=parseInt(h,16);return `<Color Self="${id}" Model="Process" Space="RGB" ColorValue="${n>>16} ${(n>>8)&255} ${n&255}" ColorOverride="Normal" Name="c_${h}"/>`}).join('')}<Swatch Self="Swatch/None" Name="None" ColorEditable="false" ColorRemovable="false" Visible="true" SwatchCreatorID="7937"/></idPkg:Graphic>`);
-    zip.file('Resources/Fonts.xml',`${HDR}<idPkg:Fonts ${NS} DOMVersion="8.0"/>`);
-    zip.file('Resources/Styles.xml',`${HDR}<idPkg:Styles ${NS} DOMVersion="8.0"><RootCharacterStyleGroup Self="rcsg"><CharacterStyle Self="CharacterStyle/$ID/[No character style]" Imported="false" Name="$ID/[No character style]"/></RootCharacterStyleGroup><RootParagraphStyleGroup Self="rpsg"><ParagraphStyle Self="ParagraphStyle/$ID/NormalParagraphStyle" Imported="false" Name="$ID/NormalParagraphStyle"/></RootParagraphStyleGroup></idPkg:Styles>`);
-    zip.file('Resources/Preferences.xml',`${HDR}<idPkg:Preferences ${NS} DOMVersion="8.0"><DocumentPreference PageHeight="${H}" PageWidth="${W}" PagesPerDocument="${specs.length}" FacingPages="false" DocumentBleedTopOffset="0" DocumentBleedBottomOffset="0" DocumentBleedInsideOrLeftOffset="0" DocumentBleedOutsideOrRightOffset="0" PageBinding="LeftToRight"/></idPkg:Preferences>`);
-    zip.file('MasterSpreads/MasterSpread_ma.xml',`${HDR}<idPkg:MasterSpread ${NS} DOMVersion="8.0"><MasterSpread Self="ma" Name="A-Gabarit" NamePrefix="A" BasedOn="n" PageCount="1" ItemTransform="1 0 0 1 0 0"><Page Self="mapg" GeometricBounds="0 0 ${H} ${W}" ItemTransform="1 0 0 1 ${-W/2} ${-H/2}" Name="A" AppliedMaster="n" OverrideList="" TabOrder="" GridStartingPoint="TopOutside" UseMasterGrid="true"><MarginPreference ColumnCount="1" ColumnGutter="0" Top="0" Bottom="0" Left="0" Right="0" ColumnDirection="Horizontal"/></Page></MasterSpread></idPkg:MasterSpread>`);
-    spreadFiles.forEach(s=>zip.file(`Spreads/Spread_${s[0]}.xml`,s[1]));
-    storyFiles.forEach(s=>zip.file(`Stories/Story_${s[0]}.xml`,s[1]));
+    // paquet = vrai squelette InDesign (styles, polices, préférences) + nos spreads, histoires et couleurs
+    const rd=n=>base.file(n).async('string'),N=specs.length;
+    let dm=await rd('designmap.xml');
+    dm=dm.replace('Name="demo"','Name="brochure"').replace('StoryList="uf6 u98"',`StoryList="u98${storyIds.length?' '+storyIds.join(' '):''}"`)
+      .replace(/<Section [^>]*>/,`<Section Self="ub4" Length="${N}" Name="" ContinueNumbering="false" IncludeSectionPrefix="false" PageNumberStart="1" Marker="" PageStart="pg1" SectionPrefix="">`)
+      .replace('<idPkg:MasterSpread src="MasterSpreads/MasterSpread_ub9.xml" />',m=>m+spreadFiles.map(sf=>`<idPkg:Spread src="Spreads/Spread_${sf[0]}.xml" />`).join(''))
+      .replace('<idPkg:BackingStory src="XML/BackingStory.xml" />',m=>m+storyFiles.map(sf=>`<idPkg:Story src="Stories/Story_${sf[0]}.xml" />`).join(''));
+    put('designmap.xml',dm);
+    let gr=await rd('Resources/Graphic.xml');
+    const cx=[...colors].map(([h,id])=>{const n=parseInt(h,16);return `<Color Self="${id}" Model="Process" Space="RGB" ColorValue="${n>>16} ${(n>>8)&255} ${n&255}" ColorOverride="Normal" ConvertToHsb="false" AlternateSpace="NoAlternateColor" AlternateColorValue="" Name="c_${h}" ColorEditable="true" ColorRemovable="true" Visible="true" SwatchCreatorID="7937" SwatchColorGroupReference="n" />`}).join('\n\t');
+    put('Resources/Graphic.xml',gr.replace('<Swatch Self="Swatch/None"',cx+'\n\t<Swatch Self="Swatch/None"'));
+    put('Resources/Preferences.xml',(await rd('Resources/Preferences.xml')).replace('PageHeight="1080" PageWidth="1920" PagesPerDocument="1"',`PageHeight="${H}" PageWidth="${W}" PagesPerDocument="${N}"`).replace('Intent="WebIntent"','Intent="PrintIntent"'));
+    put('MasterSpreads/MasterSpread_ub9.xml',(await rd('MasterSpreads/MasterSpread_ub9.xml')).replace('GeometricBounds="0 0 1080 1920"',`GeometricBounds="0 0 ${H} ${W}"`).replace('ItemTransform="1 0 0 1 -960 -540"',`ItemTransform="1 0 0 1 ${-W/2} ${-H/2}"`).replace(/<MarginPreference [^>]*>/,`<MarginPreference ColumnCount="1" ColumnGutter="12" Top="0" Bottom="0" Left="0" Right="0" ColumnDirection="Horizontal" ColumnsPositions="0 ${W}" />`));
+    const done=new Set(['mimetype','designmap.xml','Resources/Graphic.xml','Resources/Preferences.xml','MasterSpreads/MasterSpread_ub9.xml']);
+    for(const [n,f] of Object.entries(base.files)){if(f.dir||done.has(n))continue;put(n,await f.async('uint8array'))}
+    spreadFiles.forEach(s=>put(`Spreads/Spread_${s[0]}.xml`,s[1]));
+    storyFiles.forEach(s=>put(`Stories/Story_${s[0]}.xml`,s[1]));
     // contrôle de forme XML
     for(const [n,f] of Object.entries(zip.files)){if(!n.endsWith('.xml'))continue;const t=await f.async('string');const e=new DOMParser().parseFromString(t,'application/xml').querySelector('parsererror');if(e)throw new Error('XML invalide : '+n)}
-    download(await zip.generateAsync({type:'blob',mimeType:'application/vnd.adobe.indesign-idml-package'}),'brochure.idml');status('Fichier InDesign généré');
+    download(await zip.generateAsync({type:'blob',compression:'DEFLATE',mimeType:'application/vnd.adobe.indesign-idml-package'}),'brochure.idml');status('Fichier InDesign généré');
   }catch(e){console.error(e);status('Erreur INDD : '+e.message)}
 };
 
