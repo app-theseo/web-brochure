@@ -649,9 +649,9 @@ $('#xIDML').onclick=async()=>{
         }else if(it.k==='img'&&it.data){
           const d=IMGDIM.get(it.data)||{w:it.w*3,h:it.h*3};linkN++;
           const fn=`img${linkN}.${it.data.startsWith('data:image/png')?'png':'jpg'}`;
-          put('Links/'+fn,it.data.split(',')[1],{base64:true});
+          const b64=it.data.split(',')[1];
           const sc=Math.max((r-l)/d.w,(b-t)/d.h),tx=l+((r-l)-d.w*sc)/2,ty=t+((b-t)-d.h*sc)/2;
-          body+=`<Rectangle Self="${U()}" ContentType="GraphicType" ItemLayer="ub8" FillColor="Swatch/None" StrokeColor="Swatch/None" StrokeWeight="0" ItemTransform="1 0 0 1 0 0">${path(l,t,r,b)}<Image Self="${U()}" ItemTransform="${sc.toFixed(5)} 0 0 ${sc.toFixed(5)} ${tx.toFixed(3)} ${ty.toFixed(3)}"><Properties><GraphicBounds Left="0" Top="0" Right="${d.w}" Bottom="${d.h}"/></Properties><Link Self="${U()}" LinkResourceURI="file:Links/${fn}" LinkResourceFormat="$ID/${fn.endsWith('png')?'PNG':'JPEG'}"/></Image></Rectangle>`;
+          body+=`<Rectangle Self="${U()}" ContentType="GraphicType" ItemLayer="ub8" FillColor="Swatch/None" StrokeColor="Swatch/None" StrokeWeight="0" ItemTransform="1 0 0 1 0 0">${path(l,t,r,b)}<Image Self="${U()}" ItemTransform="${sc.toFixed(5)} 0 0 ${sc.toFixed(5)} ${tx.toFixed(3)} ${ty.toFixed(3)}"><Properties><GraphicBounds Left="0" Top="0" Right="${d.w}" Bottom="${d.h}"/></Properties><Link Self="${U()}" LinkResourceURI="file:${fn}" LinkResourceFormat="$ID/${fn.endsWith('png')?'PNG':'JPEG'}" StoredState="Embedded"/><Contents><![CDATA[${b64}]]></Contents></Image></Rectangle>`;
         }else if(it.k==='text'){
           const stId='st'+(uid++);storyIds.push(stId);
           const ps=it.paras.map((p,i)=>{
