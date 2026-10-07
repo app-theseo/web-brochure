@@ -632,11 +632,16 @@ function flipRuntime(){
     for(let i=0;i<len;i++){const t=i/len;d[i]=(Math.random()*2-1)*Math.pow(1-t,2)*Math.min(1,t/.05)}
     const s=ac.createBufferSource();s.buffer=b;const f=ac.createBiquadFilter();f.type='bandpass';f.frequency.value=2400;f.Q.value=.5;
     const g=ac.createGain();g.gain.value=.4;s.connect(f);f.connect(g);g.connect(ac.destination);s.start()}catch(e){}};
+  // livre fermé : couverture à droite / dernière page à gauche, on recentre le livre pendant le tournage (pas après)
+  const shift=d=>{const sh=pf.getOrientation()==='landscape'?(d===0?-25:(d===N-1&&N%2===0?25:0)):0;$('#book').style.transform='translateX('+sh+'%)'};
+  const dest=dir=>{const n=pf.getCurrentPageIndex();return dir===1?(n<=1?0:n-2):(n===0?1:Math.min(n+2,N-1))};
+  const fc=pf.getFlipController(),sm=fc.stopMove.bind(fc);
+  fc.stopMove=()=>{const c=fc.getCalculation();if(c&&c.getPosition().x<=0){shift(dest(c.getDirection()));snd()}sm()};
   const upd=()=>{const n=pf.getCurrentPageIndex(),two=pf.getOrientation()==='landscape'&&n>0&&n<N-1;
     $('#cnt').textContent=(two?(n+1)+'–'+(n+2):(n+1))+' / '+N;$('#toc').value=String(n);
-    const sh=pf.getOrientation()==='landscape'?(n===0?-25:(n===N-1&&N%2===0?25:0)):0;$('#book').style.transform='translateX('+sh+'%)';keep()};
+    shift(n);keep()};
   pf.on('flip',upd);pf.on('init',upd);
-  pf.on('changeState',e=>{if(e.data==='flipping')snd()});
+  pf.on('changeState',e=>{if(e.data==='flipping'){snd();const c=fc.getCalculation();if(c)shift(dest(c.getDirection()))}});
   $('#prev').onclick=()=>pf.flipPrev();$('#next').onclick=()=>pf.flipNext();
   $('#toc').onchange=e=>pf.flip(+e.target.value);
   const sb=$('#snd');sb.onclick=()=>{muted=!muted;sb.textContent=muted?'🔇':'🔊';sb.setAttribute('aria-pressed',String(!muted))};
