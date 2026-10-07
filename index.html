@@ -635,6 +635,13 @@ function flipRuntime(){
   const fc=pf.getFlipController(),sm=fc.stopMove.bind(fc);
   // glisser à la main : le son part quand la page est lâchée et se tourne vraiment
   fc.stopMove=()=>{const c=fc.getCalculation();if(c&&c.getPosition().x<=0)snd();sm()};
+  // livre fermé (couverture seule / dernière page seule) : centré ; le décalage suit la feuille qui tourne, image par image
+  const sFor=d=>{let pw=0;try{pw=pf.getBoundsRect().pageWidth}catch(e){}return pf.getOrientation()==='landscape'?(d===0?-pw/2:(d===N-1&&N%2===0?pw/2:0)):0};
+  const dest=dir=>{const n=pf.getCurrentPageIndex();return dir===1?(n<=1?0:n-2):(n===0?1:Math.min(n+2,N-1))};
+  const tick=()=>{let sh=sFor(pf.getCurrentPageIndex());const c=fc.getCalculation();
+    if(c&&fc.getState()!=='read'){const p=Math.min(1,Math.max(0,c.getFlippingProgress()/100));sh+=(sFor(dest(c.getDirection()))-sh)*p}
+    $('#book').style.transform='translateX('+sh.toFixed(1)+'px)';requestAnimationFrame(tick)};
+  tick();
   const upd=()=>{const n=pf.getCurrentPageIndex(),two=pf.getOrientation()==='landscape'&&n>0&&n<N-1;
     $('#cnt').textContent=(two?(n+1)+'–'+(n+2):(n+1))+' / '+N;$('#toc').value=String(n);
     keep()};
