@@ -130,6 +130,7 @@ h1.t{font-size:44px}h2.t{font-size:34px}
     <button id="xHTML">HTML</button>
     <button id="xPDF">PDF</button>
     <button id="xPPTX">PPTX</button>
+    <button id="xFLIP" title="Brochure à feuilleter (fichier HTML autonome, avec son de page)">Flipbook</button>
     <button id="xIDML" title="Fichier InDesign (IDML) : s'ouvre dans InDesign, à enregistrer ensuite en .indd">INDD (IDML)</button>
   </div>
   <div id="pages"></div>
@@ -139,6 +140,7 @@ h1.t{font-size:44px}h2.t{font-size:34px}
 <script src="lib/qrcode.min.js"></script>
 <script src="lib/cover-bg.js"></script>
 <script src="lib/idml-base.js"></script>
+<script src="lib/pageflip-src.js"></script>
 <script src="lib/pptxgen.min.js"></script>
 <script src="lib/jszip.min.js"></script>
 <script>
@@ -614,6 +616,66 @@ $('#xPPTX').onclick=async()=>{
     }
     download(await P.write({outputType:'blob'}),'brochure.pptx');status('PPTX généré');
   }catch(e){console.error(e);status('Erreur PPTX : '+e.message)}
+};
+
+/* --- Flipbook : fichier HTML autonome (pages HTML + StPageFlip), lecture seule --- */
+function flipRuntime(){
+  const $=s=>document.querySelector(s),items=[...document.querySelectorAll('.pg')],N=items.length;
+  const pf=new St.PageFlip($('#book'),{width:794,height:1123,size:'stretch',minWidth:240,maxWidth:1000,minHeight:340,maxHeight:1414,showCover:true,maxShadowOpacity:.45,flippingTime:850,usePortrait:true,mobileScrollSupport:false,autoSize:true});
+  pf.loadFromHTML(items);
+  const fit=()=>{try{const w=pf.getBoundsRect().pageWidth;if(w)document.documentElement.style.setProperty('--k',w/794)}catch(e){}};
+  const keep=()=>{let n=0;const t=()=>{fit();if(n++<30)requestAnimationFrame(t)};t()};
+  let ac=null,muted=false;
+  const snd=()=>{if(muted)return;try{
+    ac=ac||new(window.AudioContext||window.webkitAudioContext)();if(ac.state==='suspended')ac.resume();
+    const sr=ac.sampleRate,len=Math.floor(sr*.34),b=ac.createBuffer(1,len,sr),d=b.getChannelData(0);
+    for(let i=0;i<len;i++){const t=i/len;d[i]=(Math.random()*2-1)*Math.pow(1-t,2)*Math.min(1,t/.05)}
+    const s=ac.createBufferSource();s.buffer=b;const f=ac.createBiquadFilter();f.type='bandpass';f.frequency.value=2400;f.Q.value=.5;
+    const g=ac.createGain();g.gain.value=.4;s.connect(f);f.connect(g);g.connect(ac.destination);s.start()}catch(e){}};
+  const upd=()=>{const n=pf.getCurrentPageIndex(),two=pf.getOrientation()==='landscape'&&n>0&&n<N-1;
+    $('#cnt').textContent=(two?(n+1)+'–'+(n+2):(n+1))+' / '+N;$('#toc').value=String(n);
+    const sh=pf.getOrientation()==='landscape'?(n===0?-25:(n===N-1&&N%2===0?25:0)):0;$('#book').style.transform='translateX('+sh+'%)';keep()};
+  pf.on('flip',upd);pf.on('init',upd);
+  pf.on('changeState',e=>{if(e.data==='flipping')snd()});
+  $('#prev').onclick=()=>pf.flipPrev();$('#next').onclick=()=>pf.flipNext();
+  $('#toc').onchange=e=>pf.flip(+e.target.value);
+  const sb=$('#snd');sb.onclick=()=>{muted=!muted;sb.textContent=muted?'🔇':'🔊';sb.setAttribute('aria-pressed',String(!muted))};
+  const fs=$('#fs'),de=document.documentElement;
+  if(!de.requestFullscreen)fs.style.display='none';
+  fs.onclick=()=>{document.fullscreenElement?document.exitFullscreen():de.requestFullscreen()};
+  document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key==='PageDown')pf.flipNext();else if(e.key==='ArrowLeft'||e.key==='PageUp')pf.flipPrev();else if(e.key==='Home')pf.flip(0);else if(e.key==='End')pf.flip(N-1)});
+  addEventListener('resize',()=>{setTimeout(upd,60);setTimeout(upd,350)});
+  setTimeout(upd,100);
+}
+function flipbookDoc(){
+  const pg=[...$('#pages').querySelectorAll('.wrap')].map(w=>{
+    const sec=w.querySelector('section').cloneNode(true);
+    sec.querySelectorAll('[contenteditable]').forEach(e=>e.removeAttribute('contenteditable'));
+    sec.querySelectorAll('[data-slot]').forEach(e=>e.removeAttribute('data-slot'));
+    const name=sec.dataset.name,h=(sec.querySelector('h2.t,h1')||{textContent:''}).textContent.replace(/\s+/g,' ').trim();
+    return{html:sec.outerHTML,name,h,hard:/Couverture|4ᵉ/.test(name)}});
+  const title=((pg[0]&&pg[0].html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)||[])[1]||'Brochure').replace(/<[^>]+>/g,'').trim();
+  const navy=$('#cNavy').value,esc2=t=>esc(t).slice(0,70);
+  const opts=pg.map((p,i)=>`<option value="${i}">${i+1} · ${esc2(p.h||p.name)}</option>`).join('');
+  const pages=pg.map(p=>`<div class="pg"${p.hard?' data-density="hard"':''}><div class="sc">${p.html}</div></div>`).join('');
+  return '<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>'+esc(title)+'</title><style>'+$('#main-css').textContent+
+  ':root{--zoom:1;--k:.5;--accent:'+$('#cAcc').value+';--navy:'+navy+'}html,body{margin:0;height:100%;overflow:hidden;display:block}'+
+  'body{background:radial-gradient(ellipse at 50% 35%,color-mix(in srgb,'+navy+' 70%,#fff 12%),'+navy+' 75%);font-family:"Segoe UI",Inter,Arial,sans-serif}'+
+  '#stage{position:absolute;left:0;right:0;top:0;bottom:64px;display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box}'+
+  '#book{width:100%;height:100%;transition:transform .6s ease}.pg{background:#fff;overflow:hidden}.pg .sc{width:794px;height:1123px;transform:scale(var(--k));transform-origin:0 0}'+
+  '.pg .page{transform:none;margin:0}.img.ph::after{display:none}.img{cursor:default}'+
+  '#tb{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:30px;background:rgba(255,255,255,.14);backdrop-filter:blur(8px);color:#fff;font-size:13px;max-width:calc(100% - 20px);box-sizing:border-box}'+
+  '#tb button,#tb select{background:rgba(255,255,255,.16);color:#fff;border:0;border-radius:18px;padding:6px 12px;font:inherit;cursor:pointer}#tb button:hover,#tb select:hover{background:rgba(255,255,255,.3)}#tb select option{color:#111}'+
+  '#cnt{min-width:64px;text-align:center}#toc{max-width:170px;text-overflow:ellipsis}@media(max-width:560px){#toc{display:none}}'+
+  '</style></head><body><div id="stage"><div id="book">'+pages+'</div></div>'+
+  '<div id="tb"><button id="prev" aria-label="Page précédente">◀</button><span id="cnt">1 / '+pg.length+'</span><button id="next" aria-label="Page suivante">▶</button><select id="toc" aria-label="Aller à la page">'+opts+'</select><button id="snd" aria-label="Son">🔊</button><button id="fs" aria-label="Plein écran">⛶</button></div>'+
+  '<script>'+PAGEFLIP_SRC.replace(/<\//g,'<\\/')+'<\/script><script>('+flipRuntime.toString().replace(/<\//g,'<\\/')+')()<\/script></body></html>';
+}
+$('#xFLIP').onclick=()=>{
+  if(!$('#pages').children.length)return;
+  status('Génération du flipbook…');
+  try{download(new Blob([flipbookDoc()],{type:'text/html'}),'brochure-flipbook.html');status('Flipbook généré')}
+  catch(e){console.error(e);status('Erreur flipbook : '+e.message)}
 };
 
 /* --- IDML (InDesign) : paquet ZIP de fichiers XML ; ouvrir dans InDesign puis « Enregistrer sous… .indd » --- */
