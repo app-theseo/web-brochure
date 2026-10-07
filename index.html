@@ -656,8 +656,14 @@ function flipbookDoc(){
     const sec=w.querySelector('section').cloneNode(true);
     sec.querySelectorAll('[contenteditable]').forEach(e=>e.removeAttribute('contenteditable'));
     sec.querySelectorAll('[data-slot]').forEach(e=>e.removeAttribute('data-slot'));
+    // une page de garde est insérée après la couverture : les numéros imprimés (en-têtes, sommaire) avancent d'une page
+    const rn=sec.querySelector('.run>span:last-child');if(rn&&/^\d+$/.test(rn.textContent.trim()))rn.textContent=String(+rn.textContent+1);
+    sec.querySelectorAll('.toc .p').forEach(e=>{e.textContent=e.textContent.replace(/\d+/,m=>+m+1)});
     const name=sec.dataset.name,h=(sec.querySelector('h2.t,h1')||{textContent:''}).textContent.replace(/\s+/g,' ').trim();
     return{html:sec.outerHTML,name,h,hard:/Couverture|4ᵉ/.test(name)}});
+  // StPageFlip : une feuille rigide = 2 pages rigides (couverture + page de garde, page de garde + 4ᵉ de couverture), nombre de pages pair
+  const navy0=$('#cNavy').value,garde=()=>({html:`<section class="page" data-name="Page de garde" style="background:${navy0}"></section>`,name:'Page de garde',h:'(page de garde)',hard:true});
+  if(pg.length>=2){pg.splice(1,0,garde());pg.splice(pg.length-1,0,garde());if(pg.length%2)pg.splice(pg.length-2,0,{html:'<section class="page" data-name="Page blanche" style="background:#fff"></section>',name:'Page blanche',h:'(page blanche)',hard:false})}
   const title=((pg[0]&&pg[0].html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)||[])[1]||'Brochure').replace(/<[^>]+>/g,'').trim();
   const navy=$('#cNavy').value,esc2=t=>esc(t).slice(0,70);
   const opts=pg.map((p,i)=>`<option value="${i}">${i+1} · ${esc2(p.h||p.name)}</option>`).join('');
