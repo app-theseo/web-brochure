@@ -621,7 +621,7 @@ $('#xPPTX').onclick=async()=>{
 /* --- Flipbook : fichier HTML autonome (pages HTML + StPageFlip), lecture seule --- */
 function flipRuntime(){
   const $=s=>document.querySelector(s),items=[...document.querySelectorAll('.pg')],N=items.length;
-  const pf=new St.PageFlip($('#book'),{width:794,height:1123,size:'stretch',minWidth:240,maxWidth:1000,minHeight:340,maxHeight:1414,showCover:false,maxShadowOpacity:.45,flippingTime:850,usePortrait:true,mobileScrollSupport:false,autoSize:true});
+  const pf=new St.PageFlip($('#book'),{width:794,height:1123,size:'stretch',minWidth:240,maxWidth:1000,minHeight:340,maxHeight:1414,showCover:true,maxShadowOpacity:.45,flippingTime:850,usePortrait:true,mobileScrollSupport:false,autoSize:true});
   pf.loadFromHTML(items);
   const fit=()=>{try{const w=pf.getBoundsRect().pageWidth;if(w)document.documentElement.style.setProperty('--k',w/794)}catch(e){}};
   const keep=()=>{let n=0;const t=()=>{fit();if(n++<30)requestAnimationFrame(t)};t()};
@@ -632,13 +632,21 @@ function flipRuntime(){
     for(let i=0;i<len;i++){const t=i/len;d[i]=(Math.random()*2-1)*Math.pow(1-t,2)*Math.min(1,t/.05)}
     const s=ac.createBufferSource();s.buffer=b;const f=ac.createBiquadFilter();f.type='bandpass';f.frequency.value=2400;f.Q.value=.5;
     const g=ac.createGain();g.gain.value=.4;s.connect(f);f.connect(g);g.connect(ac.destination);s.start()}catch(e){}};
-  const upd=()=>{const n=pf.getCurrentPageIndex(),two=pf.getOrientation()==='landscape';
+  // livre fermé (couverture seule / dernière page seule) : centré, et le décalage suit la page qui se tourne image par image
+  const sFor=d=>{let pw=0;try{pw=pf.getBoundsRect().pageWidth}catch(e){}return pf.getOrientation()==='landscape'?(d===0?-pw/2:(d===N-1&&N%2===0?pw/2:0)):0};
+  const dest=dir=>{const n=pf.getCurrentPageIndex();return dir===1?(n<=1?0:n-2):(n===0?1:Math.min(n+2,N-1))};
+  const fc=pf.getFlipController();
+  const tick=()=>{let sh=sFor(pf.getCurrentPageIndex());const c=fc.getCalculation();
+    if(c&&fc.getState()!=='read'){const p=Math.min(1,Math.max(0,c.getFlippingProgress()/100));sh+=(sFor(dest(c.getDirection()))-sh)*p}
+    $('#book').style.transform='translateX('+sh.toFixed(1)+'px)';requestAnimationFrame(tick)};
+  tick();
+  const upd=()=>{const n=pf.getCurrentPageIndex(),two=pf.getOrientation()==='landscape'&&n>0&&n<N-1;
     $('#cnt').textContent=(two?(n+1)+'–'+(n+2):(n+1))+' / '+N;$('#toc').value=String(n);
     keep()};
   pf.on('flip',upd);pf.on('init',upd);
   pf.on('changeState',e=>{if(e.data==='flipping')snd()});
   // glisser à la main : le son part quand la page est lâchée et se tourne vraiment
-  const fc=pf.getFlipController(),sm=fc.stopMove.bind(fc);
+  const sm=fc.stopMove.bind(fc);
   fc.stopMove=()=>{const c=fc.getCalculation();if(c&&c.getPosition().x<=0)snd();sm()};
   $('#prev').onclick=()=>pf.flipPrev();$('#next').onclick=()=>pf.flipNext();
   $('#toc').onchange=e=>pf.flip(+e.target.value);
@@ -657,8 +665,6 @@ function flipbookDoc(){
     sec.querySelectorAll('[data-slot]').forEach(e=>e.removeAttribute('data-slot'));
     const name=sec.dataset.name,h=(sec.querySelector('h2.t,h1')||{textContent:''}).textContent.replace(/\s+/g,' ').trim();
     return{html:sec.outerHTML,name,h,hard:/Couverture|4ᵉ/.test(name)}});
-  // double pages complètes : nombre de pages pair (page blanche avant la 4ᵉ de couverture si besoin)
-  if(pg.length%2)pg.splice(pg.length-1,0,{html:'<section class="page" data-name="Page blanche" style="background:#fff"></section>',name:'Page blanche',h:'(page blanche)',hard:false});
   const title=((pg[0]&&pg[0].html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)||[])[1]||'Brochure').replace(/<[^>]+>/g,'').trim();
   const navy=$('#cNavy').value,esc2=t=>esc(t).slice(0,70);
   const opts=pg.map((p,i)=>`<option value="${i}">${i+1} · ${esc2(p.h||p.name)}</option>`).join('');
