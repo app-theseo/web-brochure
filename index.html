@@ -661,12 +661,12 @@ function flipbookDoc(){
   const title=((pg[0]&&pg[0].html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)||[])[1]||'Brochure').replace(/<[^>]+>/g,'').trim();
   const navy=$('#cNavy').value,esc2=t=>esc(t).slice(0,70);
   const opts=pg.map((p,i)=>`<option value="${i}">${i+1} · ${esc2(p.h||p.name)}</option>`).join('');
-  const pages=pg.map(p=>`<div class="pg"><div class="sc">${p.html}</div></div>`).join('');
+  const pages=pg.map(p=>`<div class="pg"${p.hard?' data-density="hard"':''}><div class="sc">${p.html}</div></div>`).join('');
   return '<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>'+esc(title)+'</title><style>'+$('#main-css').textContent+
   ':root{--zoom:1;--k:.5;--accent:'+$('#cAcc').value+';--navy:'+navy+'}html,body{margin:0;height:100%;overflow:hidden;display:block}'+
   'body{background:radial-gradient(ellipse at 50% 35%,color-mix(in srgb,'+navy+' 70%,#fff 12%),'+navy+' 75%);font-family:"Segoe UI",Inter,Arial,sans-serif}'+
   '#stage{position:absolute;left:0;right:0;top:0;bottom:64px;display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box}'+
-  '#book{width:100%;height:100%}.pg{background:#fff;overflow:hidden}.pg .sc{width:794px;height:1123px;transform:scale(var(--k));transform-origin:0 0}'+
+  '#book{width:100%;height:100%}.stf__block{perspective:6000px!important}.pg{background:#fff;overflow:hidden}.pg .sc{width:794px;height:1123px;transform:scale(var(--k));transform-origin:0 0}'+
   '.pg .page{transform:none;margin:0}.img.ph::after{display:none}.img{cursor:default}'+
   '#tb{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:30px;background:rgba(255,255,255,.14);backdrop-filter:blur(8px);color:#fff;font-size:13px;max-width:calc(100% - 20px);box-sizing:border-box}'+
   '#tb button,#tb select{background:rgba(255,255,255,.16);color:#fff;border:0;border-radius:18px;padding:6px 12px;font:inherit;cursor:pointer}#tb button:hover,#tb select:hover{background:rgba(255,255,255,.3)}#tb select option{color:#111}'+
