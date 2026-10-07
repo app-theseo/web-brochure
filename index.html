@@ -621,7 +621,7 @@ $('#xPPTX').onclick=async()=>{
 /* --- Flipbook : fichier HTML autonome (pages HTML + StPageFlip), lecture seule --- */
 function flipRuntime(){
   const $=s=>document.querySelector(s),items=[...document.querySelectorAll('.pg')],N=items.length;
-  const pf=new St.PageFlip($('#book'),{width:794,height:1123,size:'stretch',minWidth:240,maxWidth:1000,minHeight:340,maxHeight:1414,showCover:true,maxShadowOpacity:.45,flippingTime:850,usePortrait:true,mobileScrollSupport:false,autoSize:true});
+  const pf=new St.PageFlip($('#book'),{width:794,height:1123,size:'stretch',minWidth:240,maxWidth:1000,minHeight:340,maxHeight:1414,showCover:false,maxShadowOpacity:.45,flippingTime:850,usePortrait:true,mobileScrollSupport:false,autoSize:true});
   pf.loadFromHTML(items);
   const fit=()=>{try{const w=pf.getBoundsRect().pageWidth;if(w)document.documentElement.style.setProperty('--k',w/794)}catch(e){}};
   const keep=()=>{let n=0;const t=()=>{fit();if(n++<30)requestAnimationFrame(t)};t()};
@@ -632,17 +632,14 @@ function flipRuntime(){
     for(let i=0;i<len;i++){const t=i/len;d[i]=(Math.random()*2-1)*Math.pow(1-t,2)*Math.min(1,t/.05)}
     const s=ac.createBufferSource();s.buffer=b;const f=ac.createBiquadFilter();f.type='bandpass';f.frequency.value=2400;f.Q.value=.5;
     const g=ac.createGain();g.gain.value=.4;s.connect(f);f.connect(g);g.connect(ac.destination);s.start()}catch(e){}};
-  // livre fermé : couverture à droite / dernière page à gauche -> on recentre le livre en même temps que la page se tourne
-  const shift=d=>{let pw=0;try{pw=pf.getBoundsRect().pageWidth}catch(e){}const sh=pf.getOrientation()==='landscape'?(d===0?-pw/2:(d===N-1&&N%2===0?pw/2:0)):0;$('#book').style.transform='translateX('+Math.round(sh)+'px)'};
-  const dest=dir=>{const n=pf.getCurrentPageIndex();return dir===1?(n<=1?0:n-2):(n===0?1:Math.min(n+2,N-1))};
-  const upd=()=>{const n=pf.getCurrentPageIndex(),two=pf.getOrientation()==='landscape'&&n>0&&n<N-1;
+  const upd=()=>{const n=pf.getCurrentPageIndex(),two=pf.getOrientation()==='landscape';
     $('#cnt').textContent=(two?(n+1)+'–'+(n+2):(n+1))+' / '+N;$('#toc').value=String(n);
-    shift(n);keep()};
+    keep()};
   pf.on('flip',upd);pf.on('init',upd);
-  pf.on('changeState',e=>{if(e.data==='flipping'){snd();const c=fc.getCalculation();if(c)shift(dest(c.getDirection()))}});
+  pf.on('changeState',e=>{if(e.data==='flipping')snd()});
   // glisser à la main : le son part quand la page est lâchée et se tourne vraiment
   const fc=pf.getFlipController(),sm=fc.stopMove.bind(fc);
-  fc.stopMove=()=>{const c=fc.getCalculation();if(c&&c.getPosition().x<=0){shift(dest(c.getDirection()));snd()}sm()};
+  fc.stopMove=()=>{const c=fc.getCalculation();if(c&&c.getPosition().x<=0)snd();sm()};
   $('#prev').onclick=()=>pf.flipPrev();$('#next').onclick=()=>pf.flipNext();
   $('#toc').onchange=e=>pf.flip(+e.target.value);
   const sb=$('#snd');sb.onclick=()=>{muted=!muted;sb.textContent=muted?'🔇':'🔊';sb.setAttribute('aria-pressed',String(!muted))};
@@ -660,6 +657,8 @@ function flipbookDoc(){
     sec.querySelectorAll('[data-slot]').forEach(e=>e.removeAttribute('data-slot'));
     const name=sec.dataset.name,h=(sec.querySelector('h2.t,h1')||{textContent:''}).textContent.replace(/\s+/g,' ').trim();
     return{html:sec.outerHTML,name,h,hard:/Couverture|4ᵉ/.test(name)}});
+  // double pages complètes : nombre de pages pair (page blanche avant la 4ᵉ de couverture si besoin)
+  if(pg.length%2)pg.splice(pg.length-1,0,{html:'<section class="page" data-name="Page blanche" style="background:#fff"></section>',name:'Page blanche',h:'(page blanche)',hard:false});
   const title=((pg[0]&&pg[0].html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)||[])[1]||'Brochure').replace(/<[^>]+>/g,'').trim();
   const navy=$('#cNavy').value,esc2=t=>esc(t).slice(0,70);
   const opts=pg.map((p,i)=>`<option value="${i}">${i+1} · ${esc2(p.h||p.name)}</option>`).join('');
@@ -668,7 +667,7 @@ function flipbookDoc(){
   ':root{--zoom:1;--k:.5;--accent:'+$('#cAcc').value+';--navy:'+navy+'}html,body{margin:0;height:100%;overflow:hidden;display:block}'+
   'body{background:radial-gradient(ellipse at 50% 35%,color-mix(in srgb,'+navy+' 70%,#fff 12%),'+navy+' 75%);font-family:"Segoe UI",Inter,Arial,sans-serif}'+
   '#stage{position:absolute;left:0;right:0;top:0;bottom:64px;display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box}'+
-  '#book{width:100%;height:100%;transition:transform .85s cubic-bezier(.45,.05,.3,1)}.pg{background:#fff;overflow:hidden}.pg .sc{width:794px;height:1123px;transform:scale(var(--k));transform-origin:0 0}'+
+  '#book{width:100%;height:100%}.pg{background:#fff;overflow:hidden}.pg .sc{width:794px;height:1123px;transform:scale(var(--k));transform-origin:0 0}'+
   '.pg .page{transform:none;margin:0}.img.ph::after{display:none}.img{cursor:default}'+
   '#tb{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:30px;background:rgba(255,255,255,.14);backdrop-filter:blur(8px);color:#fff;font-size:13px;max-width:calc(100% - 20px);box-sizing:border-box}'+
   '#tb button,#tb select{background:rgba(255,255,255,.16);color:#fff;border:0;border-radius:18px;padding:6px 12px;font:inherit;cursor:pointer}#tb button:hover,#tb select:hover{background:rgba(255,255,255,.3)}#tb select option{color:#111}'+
