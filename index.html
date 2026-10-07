@@ -621,7 +621,7 @@ $('#xPPTX').onclick=async()=>{
 /* --- Flipbook : fichier HTML autonome (pages HTML + StPageFlip), lecture seule --- */
 function flipRuntime(){
   const $=s=>document.querySelector(s),items=[...document.querySelectorAll('.pg')],N=items.length;
-  const pf=new St.PageFlip($('#book'),{width:794,height:1123,size:'stretch',minWidth:240,maxWidth:1000,minHeight:340,maxHeight:1414,showCover:true,maxShadowOpacity:.45,flippingTime:850,usePortrait:true,mobileScrollSupport:false,autoSize:true});
+  const pf=new St.PageFlip($('#book'),{width:794,height:1123,size:'stretch',minWidth:240,maxWidth:1000,minHeight:340,maxHeight:1414,showCover:true,maxShadowOpacity:.45,flippingTime:850,usePortrait:true,mobileScrollSupport:false,autoSize:true,useMouseEvents:false});
   pf.loadFromHTML(items);
   const fit=()=>{try{const w=pf.getBoundsRect().pageWidth;if(w)document.documentElement.style.setProperty('--k',w/794)}catch(e){}};
   const keep=()=>{let n=0;const t=()=>{fit();if(n++<30)requestAnimationFrame(t)};t()};
@@ -646,8 +646,18 @@ function flipRuntime(){
   pf.on('flip',upd);pf.on('init',upd);
   pf.on('changeState',e=>{if(e.data==='flipping')snd()});
   // glisser à la main : le son part quand la page est lâchée et se tourne vraiment
-  const sm=fc.stopMove.bind(fc);
-  fc.stopMove=()=>{const c=fc.getCalculation();if(c&&c.getPosition().x<=0)snd();sm()};
+  // pas de glissé à la main (il déplaçait le livre sous le curseur) : clic / toucher sur la moitié gauche ou droite, ou balayage
+  const stage=$('#stage');stage.style.cursor='pointer';
+  const side=x=>{const n=pf.getCurrentPageIndex();
+    if(pf.getOrientation()!=='landscape')return x<innerWidth*.35?-1:1;
+    if(n===0)return 1;if(n===N-1&&N%2===0)return -1;
+    const r=[...document.querySelectorAll('.stf__item')].filter(e=>e.offsetParent).map(e=>e.getBoundingClientRect());
+    const mid=r.length?(Math.min(...r.map(a=>a.left))+Math.max(...r.map(a=>a.right)))/2:innerWidth/2;
+    return x<mid?-1:1};
+  let dx0=null;stage.addEventListener('mousedown',e=>{dx0=[e.clientX,e.clientY]});
+  stage.addEventListener('click',e=>{if(dx0&&Math.hypot(e.clientX-dx0[0],e.clientY-dx0[1])>10)return;side(e.clientX)<0?pf.flipPrev():pf.flipNext()});
+  let tx=null;stage.addEventListener('touchstart',e=>{tx=e.touches[0].clientX},{passive:true});
+  stage.addEventListener('touchend',e=>{if(tx===null)return;const dx=e.changedTouches[0].clientX-tx;tx=null;if(Math.abs(dx)>40){e.preventDefault();dx<0?pf.flipNext():pf.flipPrev()}},{passive:false});
   $('#prev').onclick=()=>pf.flipPrev();$('#next').onclick=()=>pf.flipNext();
   $('#toc').onchange=e=>pf.flip(+e.target.value);
   const sb=$('#snd');sb.onclick=()=>{muted=!muted;sb.textContent=muted?'🔇':'🔊';sb.setAttribute('aria-pressed',String(!muted))};
