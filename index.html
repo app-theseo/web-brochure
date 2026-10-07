@@ -621,7 +621,7 @@ $('#xPPTX').onclick=async()=>{
 /* --- Flipbook : fichier HTML autonome (pages HTML + StPageFlip), lecture seule --- */
 function flipRuntime(){
   const $=s=>document.querySelector(s),items=[...document.querySelectorAll('.pg')],N=items.length;
-  const pf=new St.PageFlip($('#book'),{width:794,height:1123,size:'stretch',minWidth:240,maxWidth:1000,minHeight:340,maxHeight:1414,showCover:true,maxShadowOpacity:.45,flippingTime:850,usePortrait:true,mobileScrollSupport:false,autoSize:true});
+  const pf=new St.PageFlip($('#book'),{width:794,height:1123,size:'stretch',minWidth:240,maxWidth:1000,minHeight:340,maxHeight:1414,showCover:true,maxShadowOpacity:.45,flippingTime:850,usePortrait:true,mobileScrollSupport:false,autoSize:true,showPageCorners:false});
   pf.loadFromHTML(items);
   const fit=()=>{try{const w=pf.getBoundsRect().pageWidth;if(w)document.documentElement.style.setProperty('--k',w/794)}catch(e){}};
   const keep=()=>{let n=0;const t=()=>{fit();if(n++<30)requestAnimationFrame(t)};t()};
